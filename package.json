@@ -1,0 +1,26 @@
+{
+  "name": "compass-mok",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint:engine": "node --check src/game/engine.js",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
+    "deploy:firestore": "firebase deploy --only firestore",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:all": "npm run build && firebase deploy",
+    "check:syntax": "node --check src/game/engine.js && node --check src/online/firebase.js && node --check src/online/appCheck.js && node --check src/online/rooms.js && node --check src/online/profiles.js && node --check src/online/ratings.js && node --check src/online/matchmaking.js && node --check src/online/serverActions.js && node --check src/online/analytics.js && node --check src/ads/adsConfig.js"
+  },
+  "dependencies": {
+    "react": "latest",
+    "react-dom": "latest",
+    "firebase": "latest"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest"
+  }
+}

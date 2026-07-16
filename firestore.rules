@@ -1,0 +1,101 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isRoomParticipant() {
+      return signedIn()
+        && (
+          resource.data.players.B == request.auth.uid ||
+          resource.data.players.W == request.auth.uid
+        );
+    }
+
+    function isRoomCreator() {
+      return signedIn()
+        && (
+          request.resource.data.players.B == request.auth.uid ||
+          request.resource.data.players.W == request.auth.uid
+        );
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+
+      // 사용자는 자신의 프로필을 처음 만들 수 있습니다.
+      // 초기 레이팅/전적 조작을 막기 위해 기본값만 허용합니다.
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.rating == 1500
+        && request.resource.data.games == 0
+        && request.resource.data.wins == 0
+        && request.resource.data.losses == 0
+        && request.resource.data.draws == 0
+        && request.resource.data.rankedGames == 0
+        && request.resource.data.rankedWins == 0
+        && request.resource.data.rankedLosses == 0
+        && request.resource.data.rankedDraws == 0;
+
+      // 레이팅/전적은 클라이언트가 수정하지 못하게 막습니다.
+      // Cloud Functions Admin SDK는 보안 규칙을 우회해서 정산합니다.
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['displayName', 'photoURL', 'isGuest', 'provider', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    match /matchQueue/{userId} {
+      allow read: if signedIn();
+
+      // 자기 큐 등록/취소는 허용합니다.
+      allow create, update, delete: if signedIn() && request.auth.uid == userId;
+
+      // MVP 매칭 확정을 위해 다른 대기열 문서 업데이트가 필요합니다.
+      // 정식 출시 시 매칭 확정도 Cloud Functions로 이동하고 이 조건을 제거하세요.
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'roomCode', 'role', 'range', 'matchedAt', 'updatedAt']);
+    }
+
+
+    match /gameResults/{resultId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /reports/{reportId} {
+      allow read: if false;
+      allow create, update, delete: if false;
+    }
+
+    match /rooms/{roomId} {
+      allow read: if signedIn();
+
+      allow create: if isRoomCreator();
+
+      // 클라이언트는 방 입장과 수 진행만 수행합니다.
+      // ratingApplied/ratingChange/users 전적은 Cloud Functions가 처리합니다.
+      allow update: if signedIn()
+        && (
+          resource.data.players.B == request.auth.uid ||
+          resource.data.players.W == request.auth.uid ||
+          resource.data.players.W == null ||
+          resource.data.players.B == null
+        )
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['ratingApplied', 'ratingChange', 'verifiedWinner', 'settledAt']);
+
+      allow delete: if false;
+
+      match /moves/{moveId} {
+        allow read: if signedIn();
+        allow create, update, delete: if false;
+      }
+    }
+  }
+}
